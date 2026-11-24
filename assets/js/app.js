@@ -16,7 +16,7 @@
     ],
     wifi: [
       { id: "ssid", label: "Network name (SSID)", placeholder: "e.g. Studio Wi-Fi", full: true },
-      { id: "password", label: "Password", placeholder: "Enter Wi-Fi password", type: "text" },
+      { id: "password", label: "Password", placeholder: "Enter Wi-Fi password", type: "text", help: "Anyone scanning this code may be able to use these network credentials." },
       { id: "security", label: "Security", select: [{ value: "WPA", label: "WPA / WPA2 / WPA3" }, { value: "WEP", label: "WEP" }, { value: "nopass", label: "No password" }] },
       { id: "hidden", label: "Hidden network", checkbox: true }
     ],
@@ -183,7 +183,7 @@
     el.innerHTML = '<i class="fa-regular ' + icon + '"></i><span></span>';
     $("span", el).textContent = message;
   }
-  function setActions(enabled) {
+  function luminance(hex) {\n    const rgb = hex.match(/[a-f0-9]{2}/gi).map(part => parseInt(part, 16) / 255).map(c => c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));\n    return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];\n  }\n  function contrastRatio(fg, bg) {\n    const a = luminance(fg), b = luminance(bg);\n    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);\n  }\n  function setActions(enabled) {
     $("#downloadPng").disabled = !enabled;
     $("#downloadSvg").disabled = !enabled;
     $("#saveCode").disabled = !enabled;
@@ -240,7 +240,7 @@
         $("#qrPlaceholder").hidden = true;
         $("#qrRender").hidden = false;
         $("#qrRender").replaceChildren(result.canvas);
-        setStatus("QR code ready · " + result.count + " × " + result.count + " modules", "good");
+        const ratio = contrastRatio(settings.fg, settings.bg);\n        if (ratio < 4.5) setStatus("Low contrast (" + ratio.toFixed(1) + ":1). Choose darker QR colour for reliable scanning.", "warn");\n        else setStatus("QR code ready · " + result.count + " × " + result.count + " modules", "good");
         setActions(true);
       } catch (error) {
         state.valid = false;
@@ -312,96 +312,44 @@
     if (!state.valid) return;
     const items = readSaved();
     const title = (state.payload.length > 42 ? state.payload.slice(0, 39) + "…" : state.payload) || typeNames[state.type];
-    items.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: state.type, title, payload: state.payload, savedAt: new Date().toISOString(), settings: qrSettings() });
-    if (writeSaved(items)) { renderSaved(); showToast("QR code saved in this browser."); }
-  }
-  function renderSaved() {
-    const items = readSaved();
-    $("#savedCount").textContent = items.length;
-    const list = $("#savedList");
-    list.replaceChildren();
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty-saved";
-      empty.innerHTML = '<i class="fa-regular fa-folder-open"></i><span>Your saved codes will show up here.</span>';
-      list.appendChild(empty);
-      return;
-    }
-    items.slice(0, 5).forEach(item => {
-      const row = document.createElement("div");
-      row.className = "saved-item";
-      const thumb = document.createElement("div"); thumb.className = "saved-thumb";
-      const icon = document.createElement("i"); icon.className = "fa-solid " + (iconNames[item.type] || "fa-qrcode"); thumb.appendChild(icon);
-      const meta = document.createElement("div"); meta.className = "saved-meta";
-      const title = document.createElement("strong"); title.textContent = item.title || typeNames[item.type];
-      const sub = document.createElement("span"); sub.textContent = (typeNames[item.type] || "QR code") + " · " + new Date(item.savedAt).toLocaleDateString();
-      meta.append(title, sub);
-      const load = document.createElement("button"); load.type = "button"; load.title = "Load QR code"; load.setAttribute("aria-label", "Load " + (item.title || "saved QR code")); load.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i>';
-      load.addEventListener("click", () => loadSaved(item));
-      const remove = document.createElement("button"); remove.type = "button"; remove.title = "Delete"; remove.setAttribute("aria-label", "Delete saved QR code"); remove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
-      remove.addEventListener("click", () => { writeSaved(readSaved().filter(x => x.id !== item.id)); renderSaved(); });
-      row.append(thumb, meta, load, remove); list.appendChild(row);
+    const formData = {};
+    fields[state.type].forEach(field => {
+      const el = $("#" + field.id);
+      if (el) formData[field.id] = el.type === "checkbox" ? el.checked : el.value;
     });
-  }
-  function loadSaved(item) {
-    const button = $('.type-card[data-type="' + item.type + '"]');
-    if (button) button.click();
+    items.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: state.type, title, payload: state.payload, formData, savedAt: new Date().toISOString(), settings: qrSettings() });
+    if (writeSaved(items)) { renderSaved(); showToast("QR code saved in this browser."); }
+  }  function loadSaved(item) {
+    chooseType(item.type);
     const settings = item.settings || {};
     if (settings.fg) $("#fgColor").value = settings.fg;
     if (settings.bg) $("#bgColor").value = settings.bg;
     if (settings.size) $("#qrSize").value = String(settings.size);
     if (settings.level) $("#qrLevel").value = settings.level;
-    const idMap = {
-      url: { url: item.payload }, text: { text: item.payload },
-      whatsapp: { waPhone: item.payload.match(/^https:\/\/wa\.me\/([^?]+)/)?.[1] || "", waMessage: new URL(item.payload).searchParams.get("text") || "" }
-    };
-    if (idMap[item.type]) Object.entries(idMap[item.type]).forEach(([id, val]) => { if ($("#" + id)) $("#" + id).value = val; });
-    if (item.type === "url" || item.type === "text" || item.type === "whatsapp") updateQR();
-    else {
-      showToast("This saved QR is available in your browser history, but its editable fields are not restored yet.");
-      state.payload = item.payload;
-      state.valid = true;
-      try { const result = renderMatrix(item.payload); state.matrix = result; state.canvas = result.canvas; $("#qrPlaceholder").hidden = true; $("#qrRender").hidden = false; $("#qrRender").replaceChildren(result.canvas); setStatus("Saved QR code loaded", "good"); setActions(true); } catch (e) { showToast(e.message); }
+    $("#fgHex").textContent = $("#fgColor").value.toUpperCase();
+    $("#bgHex").textContent = $("#bgColor").value.toUpperCase();
+    if (item.formData && typeof item.formData === "object") {
+      Object.entries(item.formData).forEach(([id, val]) => {
+        const el = $("#" + id);
+        if (el) {
+          if (el.type === "checkbox") el.checked = Boolean(val);
+          else el.value = val;
+        }
+      });
+      updateQR();
+    } else {
+      try {
+        const result = renderMatrix(item.payload);
+        state.payload = item.payload;
+        state.valid = true;
+        state.matrix = result;
+        state.canvas = result.canvas;
+        $("#qrPlaceholder").hidden = true;
+        $("#qrRender").hidden = false;
+        $("#qrRender").replaceChildren(result.canvas);
+        setStatus("Saved QR code loaded · edit fields to rebuild", "good");
+        setActions(true);
+      } catch (error) { showToast(error.message); }
     }
     $("#studio").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-
-  function chooseType(type) {
-    if (!fields[type]) return;
-    state.type = type;
-    $$(".type-card").forEach(button => {
-      const active = button.dataset.type === type;
-      button.classList.toggle("selected", active);
-      button.setAttribute("aria-pressed", active ? "true" : "false");
-    });
-    renderFields();
-  }
-
-  $$(".type-card").forEach(button => {
-    button.setAttribute("aria-pressed", button.classList.contains("selected") ? "true" : "false");
-    button.addEventListener("click", () => chooseType(button.dataset.type));
-  });
-  $("#dynamicFields").addEventListener("input", scheduleUpdate);
-  $("#dynamicFields").addEventListener("change", scheduleUpdate);
-  ["fgColor", "bgColor", "qrSize", "qrLevel"].forEach(id => {
-    $("#" + id).addEventListener("input", () => {
-      if (id === "fgColor") $("#fgHex").textContent = $("#" + id).value.toUpperCase();
-      if (id === "bgColor") $("#bgHex").textContent = $("#" + id).value.toUpperCase();
-      updateQR();
-    });
-    $("#" + id).addEventListener("change", updateQR);
-  });
-  $("#downloadPng").addEventListener("click", downloadPng);
-  $("#downloadSvg").addEventListener("click", downloadSvg);
-  $("#saveCode").addEventListener("click", saveCurrent);
-  $("#clearFields").addEventListener("click", () => { renderFields(); showToast("Fields cleared."); });
-  $("#clearSaved").addEventListener("click", () => {
-    if (!readSaved().length) return;
-    if (window.confirm("Delete all QR codes saved in this browser?")) { localStorage.removeItem(storageKey); renderSaved(); showToast("Saved codes cleared."); }
-  });
-  $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
-  $("#navMyCodes").addEventListener("click", () => { $("#sidebar").classList.remove("open"); setTimeout(() => $("#my-codes").scrollIntoView({ behavior: "smooth" }), 80); });
-
-  renderSaved();
-  renderFields();
-})();
