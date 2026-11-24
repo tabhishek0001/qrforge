@@ -202,7 +202,15 @@
     el.innerHTML = '<i class="fa-regular ' + icon + '"></i><span></span>';
     $("span", el).textContent = message;
   }
-  function luminance(hex) {\n    const rgb = hex.match(/[a-f0-9]{2}/gi).map(part => parseInt(part, 16) / 255).map(c => c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));\n    return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];\n  }\n  function contrastRatio(fg, bg) {\n    const a = luminance(fg), b = luminance(bg);\n    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);\n  }\n  function setActions(enabled) {
+  function luminance(hex) {
+    const rgb = hex.match(/[a-f0-9]{2}/gi).map(part => parseInt(part, 16) / 255).map(c => c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));
+    return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+  }
+  function contrastRatio(fg, bg) {
+    const a = luminance(fg), b = luminance(bg);
+    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+  }
+  function setActions(enabled) {
     $("#downloadPng").disabled = !enabled;
     $("#downloadSvg").disabled = !enabled;
     $("#saveCode").disabled = !enabled;
