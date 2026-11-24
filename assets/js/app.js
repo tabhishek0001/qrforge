@@ -381,3 +381,65 @@
     }
     $("#studio").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  function chooseType(type) {
+    if (!Object.prototype.hasOwnProperty.call(fields, type)) return;
+    state.type = type;
+    $$(".type-card").forEach(button => {
+      const active = button.dataset.type === type;
+      button.classList.toggle("selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    renderFields();
+  }
+
+  // Delegate events because the contextual fields are replaced when QR type changes.
+  $("#dynamicFields").addEventListener("input", scheduleUpdate);
+  $("#dynamicFields").addEventListener("change", scheduleUpdate);
+
+  $$(".type-card").forEach(button => {
+    button.setAttribute("aria-pressed", button.classList.contains("selected") ? "true" : "false");
+    button.addEventListener("click", () => chooseType(button.dataset.type));
+  });
+
+  ["fgColor", "bgColor", "qrSize", "qrLevel"].forEach(id => {
+    const control = $("#" + id);
+    control.addEventListener("input", () => {
+      if (id === "fgColor") $("#fgHex").textContent = control.value.toUpperCase();
+      if (id === "bgColor") $("#bgHex").textContent = control.value.toUpperCase();
+      updateQR();
+    });
+    control.addEventListener("change", updateQR);
+  });
+
+  $("#payloadForm").addEventListener("submit", event => event.preventDefault());
+  $("#downloadPng").addEventListener("click", downloadPng);
+  $("#downloadSvg").addEventListener("click", downloadSvg);
+  $("#saveCode").addEventListener("click", saveCurrent);
+  $("#clearFields").addEventListener("click", () => {
+    renderFields();
+    showToast("Fields cleared.");
+  });
+  $("#clearSaved").addEventListener("click", () => {
+    if (!readSaved().length) return;
+    if (window.confirm("Delete all QR codes saved in this browser?")) {
+      try {
+        localStorage.removeItem(storageKey);
+        renderSaved();
+        showToast("Saved codes cleared.");
+      } catch (_) {
+        showToast("Browser storage is unavailable.");
+      }
+    }
+  });
+  $("#menuToggle").addEventListener("click", () => {
+    $("#sidebar").classList.toggle("open");
+  });
+  $("#navMyCodes").addEventListener("click", () => {
+    $("#sidebar").classList.remove("open");
+    window.setTimeout(() => $("#my-codes").scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  });
+
+  renderSaved();
+  renderFields();
+})();
