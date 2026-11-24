@@ -6,7 +6,7 @@ QRForge is a browser-first QR code studio for creating practical, scan-ready QR 
 
 ## MVP scope
 
-- URL, text, email, phone, SMS, WhatsApp, Wi-Fi, vCard, location and calendar event payloads
+- URL, text, email, phone, SMS, WhatsApp, Wi-Fi, UPI payment, vCard, location and calendar event payloads
 - Live QR preview
 - Foreground/background colors, size, margin and error-correction controls
 - PNG and SVG downloads
@@ -42,4 +42,4 @@ Open `index.html` in a modern browser. For consistent local development, serve t
 
 ## Status
 
-Initial development. Not yet production-ready.
+Initial development on `feature/static-qr-studio-mvp`. The implementation is under review and is not yet production-ready. See `docs/HUB-PRODUCT-LISTING.md` for the Hub listing draft and release checklist.
