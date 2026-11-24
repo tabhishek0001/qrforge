@@ -80,8 +80,6 @@
 
   function renderFields() {
     $("#dynamicFields").innerHTML = fields[state.type].map(fieldMarkup).join("");
-    $("#dynamicFields").addEventListener("input", scheduleUpdate, { once: true });
-    $("#dynamicFields").addEventListener("change", scheduleUpdate, { once: true });
     updateQR();
   }
 
@@ -348,7 +346,8 @@
     });
     items.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: state.type, title, payload: state.payload, formData, savedAt: new Date().toISOString(), settings: qrSettings() });
     if (writeSaved(items)) { renderSaved(); showToast("QR code saved in this browser."); }
-  }  function loadSaved(item) {
+  }
+  function loadSaved(item) {
     chooseType(item.type);
     const settings = item.settings || {};
     if (settings.fg) $("#fgColor").value = settings.fg;
