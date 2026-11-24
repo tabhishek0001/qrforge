@@ -335,6 +335,88 @@
     try { localStorage.setItem(storageKey, JSON.stringify(items.slice(0, 30))); return true; }
     catch (_) { showToast("Browser storage is full or unavailable."); return false; }
   }
+  function renderSaved() {
+    const list = $("#savedList");
+    const count = $("#savedCount");
+    const items = readSaved();
+
+    if (count) count.textContent = String(items.length);
+    list.replaceChildren();
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-saved";
+      const icon = document.createElement("i");
+      icon.className = "fa-regular fa-folder-open";
+      const message = document.createElement("span");
+      message.textContent = "Your saved codes will show up here.";
+      empty.append(icon, message);
+      list.appendChild(empty);
+      return;
+    }
+
+    items.forEach(item => {
+      if (!item || typeof item !== "object" || typeof item.id !== "string") return;
+
+      const row = document.createElement("div");
+      row.className = "saved-item";
+
+      const thumb = document.createElement("div");
+      thumb.className = "saved-thumb";
+      const icon = document.createElement("i");
+      icon.className = "fa-solid fa-qrcode";
+      thumb.appendChild(icon);
+
+      const meta = document.createElement("div");
+      meta.className = "saved-meta";
+      const title = document.createElement("strong");
+      title.textContent = typeof item.title === "string" && item.title.trim()
+        ? item.title
+        : (typeNames[item.type] || "Saved QR code");
+      const details = document.createElement("span");
+      const savedDate = item.savedAt ? new Date(item.savedAt) : null;
+      const dateLabel = savedDate && !Number.isNaN(savedDate.getTime())
+        ? savedDate.toLocaleDateString()
+        : "Saved in this browser";
+      details.textContent = (typeNames[item.type] || "QR code") + " · " + dateLabel;
+      meta.append(title, details);
+
+      const openButton = document.createElement("button");
+      openButton.type = "button";
+      openButton.className = "text-btn";
+      openButton.title = "Load saved QR code";
+      openButton.setAttribute("aria-label", "Load " + title.textContent);
+      openButton.textContent = "Open";
+      openButton.addEventListener("click", () => loadSaved(item));
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "text-btn";
+      deleteButton.title = "Delete saved QR code";
+      deleteButton.setAttribute("aria-label", "Delete " + title.textContent);
+      const deleteIcon = document.createElement("i");
+      deleteIcon.className = "fa-regular fa-trash-can";
+      deleteButton.appendChild(deleteIcon);
+      deleteButton.addEventListener("click", () => {
+        const remaining = readSaved().filter(saved => saved && saved.id !== item.id);
+        if (writeSaved(remaining)) {
+          renderSaved();
+          showToast("Saved QR code deleted.");
+        }
+      });
+
+      row.append(thumb, meta, openButton, deleteButton);
+      list.appendChild(row);
+    });
+
+    if (!list.childElementCount) {
+      const empty = document.createElement("div");
+      empty.className = "empty-saved";
+      empty.textContent = "No valid saved QR codes were found.";
+      list.appendChild(empty);
+    }
+  }
+
   function saveCurrent() {
     if (!state.valid) return;
     const items = readSaved();
