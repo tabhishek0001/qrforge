@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7fb">
+  <meta name="description" content="Create beautiful, scan-ready QR codes for links, Wi-Fi, contacts, events and more with QRForge.">
+  <title>QRForge — QR Code Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link href="assets/css/app.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
+  <script src="assets/js/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="QRForge home">
+        <span class="brand-mark"><i class="fa-solid fa-qrcode"></i></span>
+        <span>QR<span class="brand-light">Forge</span><small>QR CODE STUDIO</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="side-link active" href="#studio"><i class="fa-solid fa-wand-magic-sparkles"></i><span>QR Studio</span><span class="nav-dot"></span></a>
+        <a class="side-link" href="#my-codes" id="navMyCodes"><i class="fa-regular fa-folder-open"></i><span>My QR codes</span><span class="nav-count" id="savedCount">0</span></a>
+        <a class="side-link disabled-link" href="#" aria-disabled="true" title="Coming in a future release"><i class="fa-solid fa-chart-line"></i><span>Analytics</span><span class="soon-label">SOON</span></a>
+        <a class="side-link disabled-link" href="#" aria-disabled="true" title="Coming in a future release"><i class="fa-solid fa-layer-group"></i><span>Bulk generator</span><span class="soon-label">SOON</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="privacy-card">
+          <span class="privacy-icon"><i class="fa-solid fa-shield-halved"></i></span>
+          <strong>Your data stays yours</strong>
+          <p>Static QR codes are generated in your browser. Your content isn't uploaded.</p>
+        </div>
+        <div class="sidebar-foot"><span class="status-dot"></span> All systems operational <span class="version">v0.1</span></div>
+      </div>
+    </aside>
+
+    <main class="main-area" id="studio">
+      <header class="topbar">
+        <div class="d-flex align-items-center gap-3">
+          <button class="icon-btn mobile-menu" id="menuToggle" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
+          <div><div class="eyebrow">WORKSPACE / QR STUDIO</div><h1>Create a QR code</h1></div>
+        </div>
+        <div class="topbar-actions">
+          <span class="free-pill"><i class="fa-solid fa-sparkles"></i> Free studio</span>
+          <button class="avatar-btn" type="button" aria-label="Guest workspace"><i class="fa-regular fa-user"></i></button>
+        </div>
+      </header>
+
+      <section class="welcome-row">
+        <div><h2>Make it easy to connect.</h2><p>Choose what your QR code should do, make it yours, and share it anywhere.</p></div>
+        <div class="trust-note"><i class="fa-solid fa-lock"></i> No sign-up. No upload. Just create.</div>
+      </section>
+
+      <section class="studio-grid">
+        <div class="editor-column">
+          <section class="panel type-panel">
+            <div class="panel-heading"><div><span class="step-label">STEP 01</span><h3>Choose QR type</h3><p>What would you like people to open?</p></div><span class="step-number">01</span></div>
+            <div class="type-groups">
+              <div class="type-group"><div class="group-label">POPULAR</div><div class="type-grid">
+                <button class="type-card selected" data-type="url"><span class="type-icon violet"><i class="fa-solid fa-link"></i></span><span>Website URL</span><small>Open a webpage</small></button>
+                <button class="type-card" data-type="text"><span class="type-icon blue"><i class="fa-solid fa-align-left"></i></span><span>Plain text</span><small>Share a message</small></button>
+                <button class="type-card" data-type="wifi"><span class="type-icon teal"><i class="fa-solid fa-wifi"></i></span><span>Wi-Fi</span><small>Join a network</small></button>
+                <button class="type-card" data-type="whatsapp"><span class="type-icon green"><i class="fa-brands fa-whatsapp"></i></span><span>WhatsApp</span><small>Start a chat</small></button>
+              </div></div>
+              <div class="type-group"><div class="group-label">CONTACT & COMMUNICATION</div><div class="type-grid">
+                <button class="type-card" data-type="email"><span class="type-icon orange"><i class="fa-regular fa-envelope"></i></span><span>Email</span><small>Compose an email</small></button>
+                <button class="type-card" data-type="phone"><span class="type-icon blue"><i class="fa-solid fa-phone"></i></span><span>Phone</span><small>Make a call</small></button>
+                <button class="type-card" data-type="sms"><span class="type-icon pink"><i class="fa-regular fa-message"></i></span><span>SMS</span><small>Send a message</small></button>
+                <button class="type-card" data-type="vcard"><span class="type-icon purple"><i class="fa-regular fa-address-card"></i></span><span>Contact card</span><small>Save a contact</small></button>
+              </div></div>
+              <div class="type-group"><div class="group-label">PLACES & EVENTS</div><div class="type-grid">
+                <button class="type-card" data-type="location"><span class="type-icon red"><i class="fa-solid fa-location-dot"></i></span><span>Location</span><small>Open a map</small></button>
+                <button class="type-card" data-type="event"><span class="type-icon amber"><i class="fa-regular fa-calendar"></i></span><span>Event</span><small>Add to calendar</small></button>
+              </div></div>
+            </div>
+          </section>
+
+          <section class="panel content-panel">
+            <div class="panel-heading"><div><span class="step-label">STEP 02</span><h3>Add your content</h3><p>Enter the details for your QR code.</p></div><span class="step-number">02</span></div>
+            <form id="payloadForm" novalidate>
+              <div id="dynamicFields" class="field-grid"></div>
+              <div class="form-foot"><span class="privacy-inline"><i class="fa-solid fa-shield-halved"></i> Processed locally in your browser</span><button class="text-btn" type="button" id="clearFields"><i class="fa-solid fa-rotate-left"></i> Clear fields</button></div>
+            </form>
+          </section>
+
+          <section class="panel design-panel">
+            <div class="panel-heading"><div><span class="step-label">STEP 03</span><h3>Make it yours</h3><p>Customize the look while keeping it easy to scan.</p></div><span class="step-number">03</span></div>
+            <div class="design-controls">
+              <div class="control-block"><label class="control-label" for="fgColor">QR colour</label><div class="color-control"><input type="color" id="fgColor" value="#17172f"><span id="fgHex">#17172F</span></div></div>
+              <div class="control-block"><label class="control-label" for="bgColor">Background</label><div class="color-control"><input type="color" id="bgColor" value="#ffffff"><span id="bgHex">#FFFFFF</span></div></div>
+              <div class="control-block"><label class="control-label" for="qrSize">Image size</label><select class="form-select form-select-sm" id="qrSize"><option value="256">256 × 256</option><option value="512" selected>512 × 512</option><option value="1024">1024 × 1024</option></select></div>
+              <div class="control-block"><label class="control-label" for="qrLevel">Error correction</label><select class="form-select form-select-sm" id="qrLevel"><option value="L">Low · 7%</option><option value="M" selected>Medium · 15%</option><option value="Q">Quartile · 25%</option><option value="H">High · 30%</option></select></div>
+            </div>
+            <div class="design-note"><i class="fa-solid fa-circle-info"></i><span>For best scan reliability, use a dark QR colour on a light background. Avoid low contrast and very long content.</span></div>
+          </section>
+        </div>
+
+        <aside class="preview-column">
+          <section class="preview-panel">
+            <div class="preview-top"><div><span class="step-label">LIVE PREVIEW</span><h3>Your QR code</h3></div><span class="live-indicator"><span></span> LIVE</span></div>
+            <div class="qr-stage" id="qrStage">
+              <div class="qr-placeholder" id="qrPlaceholder"><div class="placeholder-icon"><i class="fa-solid fa-qrcode"></i></div><strong>Your QR code will appear here</strong><span>Choose a type and add your content to get started.</span></div>
+              <div id="qrRender" class="qr-render" aria-label="Generated QR code" hidden></div>
+            </div>
+            <div class="scan-status" id="scanStatus"><i class="fa-regular fa-circle"></i><span>Waiting for your content</span></div>
+            <div class="preview-actions"><button class="btn-download" id="downloadPng" disabled><i class="fa-solid fa-download"></i> Download PNG</button><button class="btn-secondary-action" id="downloadSvg" disabled><i class="fa-regular fa-file-code"></i><span>SVG</span></button></div>
+            <button class="save-btn" id="saveCode" disabled><i class="fa-regular fa-bookmark"></i> Save to this browser</button>
+            <p class="preview-footnote"><i class="fa-solid fa-circle-check"></i> Your QR code is generated on this device.</p>
+          </section>
+          <section class="tip-card"><div class="tip-icon"><i class="fa-solid fa-lightbulb"></i></div><div><strong>Quick tip</strong><p>Always scan-test your QR code before printing. A small test now can save a big reprint later.</p></div></section>
+          <section class="saved-panel" id="my-codes"><div class="saved-heading"><div><span class="step-label">YOUR LIBRARY</span><h3>Recently saved</h3></div><button class="text-btn" id="clearSaved" type="button">Clear all</button></div><div id="savedList" class="saved-list"><div class="empty-saved"><i class="fa-regular fa-folder-open"></i><span>Your saved codes will show up here.</span></div></div></section>
+        </aside>
+      </section>
+      <footer class="main-footer"><span>© 2026 QRForge. Made for simpler connections.</span><span><i class="fa-solid fa-shield-halved"></i> Static QR generation happens locally</span></footer>
+    </main>
+  </div>
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastArea" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
