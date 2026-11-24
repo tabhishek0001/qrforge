@@ -5,8 +5,8 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const state = { type: "url", payload: "", canvas: null, matrix: null, valid: false, debounce: null, logo: null };
   const storageKey = "qrforge.saved.v1";
-  const typeNames = { url: "Website URL", text: "Plain text", wifi: "Wi-Fi", whatsapp: "WhatsApp", email: "Email", phone: "Phone", sms: "SMS", vcard: "Contact card", location: "Location", event: "Event" };
-  const iconNames = { url: "fa-link", text: "fa-align-left", wifi: "fa-wifi", whatsapp: "fa-whatsapp", email: "fa-envelope", phone: "fa-phone", sms: "fa-message", vcard: "fa-address-card", location: "fa-location-dot", event: "fa-calendar" };
+  const typeNames = { url: "Website URL", text: "Plain text", wifi: "Wi-Fi", whatsapp: "WhatsApp", email: "Email", phone: "Phone", sms: "SMS", vcard: "Contact card", location: "Location", event: "Event", upi: "UPI payment" };
+  const iconNames = { url: "fa-link", text: "fa-align-left", wifi: "fa-wifi", whatsapp: "fa-whatsapp", email: "fa-envelope", phone: "fa-phone", sms: "fa-message", vcard: "fa-address-card", location: "fa-location-dot", event: "fa-calendar", upi: "fa-indian-rupee-sign" };
   const fields = {
     url: [
       { id: "url", label: "Website URL", placeholder: "https://example.com", type: "url", full: true, help: "Include a website address. If you omit https://, QRForge adds it." }
@@ -54,6 +54,12 @@
       { id: "eventStart", label: "Starts", type: "datetime-local" },
       { id: "eventEnd", label: "Ends", type: "datetime-local" },
       { id: "eventDescription", label: "Description (optional)", placeholder: "Add event details…", textarea: true, full: true }
+    ],
+    upi: [
+      { id: "upiId", label: "UPI ID / VPA", placeholder: "yourname@bank", full: true, help: "Use the exact UPI ID provided by your bank or payment app." },
+      { id: "upiName", label: "Payee name", placeholder: "Business or recipient name", full: true },
+      { id: "upiAmount", label: "Amount in ₹ (optional)", placeholder: "250.00", type: "number" },
+      { id: "upiNote", label: "Payment note (optional)", placeholder: "Invoice or order reference" }
     ]
   };
 
@@ -159,6 +165,19 @@
         if (value("latitude") === "" || value("longitude") === "" || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) throw new Error("Enter valid latitude (−90 to 90) and longitude (−180 to 180).");
         const label = value("placeName");
         return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(lat + "," + lon + (label ? " (" + label + ")" : ""));
+      }
+      case "upi": {
+        const upiId = required(value("upiId"), "a UPI ID");
+        if (!/^[a-zA-Z0-9._-]{2,256}@[a-zA-Z0-9]{2,64}$/.test(upiId)) throw new Error("Enter a valid UPI ID, for example name@bank.");
+        const params = new URLSearchParams({ pa: upiId, cu: "INR" });
+        if (value("upiName")) params.set("pn", value("upiName"));
+        if (value("upiAmount")) {
+          const amount = Number(value("upiAmount"));
+          if (!Number.isFinite(amount) || amount <= 0 || !/^\\d+(?:\\.\\d{1,2})?$/.test(value("upiAmount"))) throw new Error("Enter a valid payment amount with up to two decimal places.");
+          params.set("am", amount.toFixed(2));
+        }
+        if (value("upiNote")) params.set("tn", value("upiNote"));
+        return "upi://pay?" + params.toString();
       }
       case "event": {
         const title = required(value("eventTitle"), "an event title");
