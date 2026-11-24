@@ -1,0 +1,407 @@
+(() => {
+  "use strict";
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const state = { type: "url", payload: "", canvas: null, matrix: null, valid: false, debounce: null, logo: null };
+  const storageKey = "qrforge.saved.v1";
+  const typeNames = { url: "Website URL", text: "Plain text", wifi: "Wi-Fi", whatsapp: "WhatsApp", email: "Email", phone: "Phone", sms: "SMS", vcard: "Contact card", location: "Location", event: "Event" };
+  const iconNames = { url: "fa-link", text: "fa-align-left", wifi: "fa-wifi", whatsapp: "fa-whatsapp", email: "fa-envelope", phone: "fa-phone", sms: "fa-message", vcard: "fa-address-card", location: "fa-location-dot", event: "fa-calendar" };
+  const fields = {
+    url: [
+      { id: "url", label: "Website URL", placeholder: "https://example.com", type: "url", full: true, help: "Include a website address. If you omit https://, QRForge adds it." }
+    ],
+    text: [
+      { id: "text", label: "Your message", placeholder: "Write the text you want to share…", textarea: true, full: true }
+    ],
+    wifi: [
+      { id: "ssid", label: "Network name (SSID)", placeholder: "e.g. Studio Wi-Fi", full: true },
+      { id: "password", label: "Password", placeholder: "Enter Wi-Fi password", type: "text" },
+      { id: "security", label: "Security", select: [{ value: "WPA", label: "WPA / WPA2 / WPA3" }, { value: "WEP", label: "WEP" }, { value: "nopass", label: "No password" }] },
+      { id: "hidden", label: "Hidden network", checkbox: true }
+    ],
+    whatsapp: [
+      { id: "waPhone", label: "WhatsApp number", placeholder: "91 98765 43210", full: true, help: "Enter country code and number. Do not include the + sign." },
+      { id: "waMessage", label: "Pre-filled message (optional)", placeholder: "Hello! I would like to know more…", textarea: true, full: true }
+    ],
+    email: [
+      { id: "emailTo", label: "Email address", placeholder: "hello@example.com", type: "email", full: true },
+      { id: "emailSubject", label: "Subject", placeholder: "Hello" },
+      { id: "emailBody", label: "Message (optional)", placeholder: "Write a message…", textarea: true, full: true }
+    ],
+    phone: [{ id: "phone", label: "Phone number", placeholder: "+91 98765 43210", type: "tel", full: true }],
+    sms: [
+      { id: "smsPhone", label: "Phone number", placeholder: "+91 98765 43210", type: "tel", full: true },
+      { id: "smsMessage", label: "Message (optional)", placeholder: "Write a text message…", textarea: true, full: true }
+    ],
+    vcard: [
+      { id: "firstName", label: "First name", placeholder: "Aarav" },
+      { id: "lastName", label: "Last name", placeholder: "Sharma" },
+      { id: "org", label: "Company", placeholder: "Company name" },
+      { id: "title", label: "Job title", placeholder: "Product Designer" },
+      { id: "mobile", label: "Phone", placeholder: "+91 98765 43210", type: "tel" },
+      { id: "workEmail", label: "Email", placeholder: "hello@example.com", type: "email" },
+      { id: "website", label: "Website", placeholder: "https://example.com", full: true }
+    ],
+    location: [
+      { id: "latitude", label: "Latitude", placeholder: "28.6139", type: "number" },
+      { id: "longitude", label: "Longitude", placeholder: "77.2090", type: "number" },
+      { id: "placeName", label: "Place name (optional)", placeholder: "India Gate", full: true }
+    ],
+    event: [
+      { id: "eventTitle", label: "Event title", placeholder: "Product launch", full: true },
+      { id: "eventLocation", label: "Location", placeholder: "Venue or address", full: true },
+      { id: "eventStart", label: "Starts", type: "datetime-local" },
+      { id: "eventEnd", label: "Ends", type: "datetime-local" },
+      { id: "eventDescription", label: "Description (optional)", placeholder: "Add event details…", textarea: true, full: true }
+    ]
+  };
+
+  function fieldMarkup(field) {
+    const id = field.id;
+    let control = "";
+    if (field.select) {
+      control = '<select class="form-select" id="' + id + '">' + field.select.map(o => '<option value="' + o.value + '">' + o.label + '</option>').join("") + '</select>';
+    } else if (field.checkbox) {
+      control = '<label class="switch-row" for="' + id + '"><input type="checkbox" id="' + id + '"><span class="switch-track"></span><span class="switch-copy">Yes, this network is hidden</span></label>';
+    } else if (field.textarea) {
+      control = '<textarea class="form-control" id="' + id + '" placeholder="' + (field.placeholder || "") + '"></textarea>';
+    } else {
+      control = '<input class="form-control" id="' + id + '" type="' + (field.type || "text") + '" placeholder="' + (field.placeholder || "") + '" autocomplete="off">';
+    }
+    return '<div class="field-wrap' + (field.full ? ' full' : '') + '"><label for="' + id + '">' + field.label + '</label>' + control + (field.help ? '<div class="field-help">' + field.help + '</div>' : '') + '</div>';
+  }
+
+  function renderFields() {
+    $("#dynamicFields").innerHTML = fields[state.type].map(fieldMarkup).join("");
+    $("#dynamicFields").addEventListener("input", scheduleUpdate, { once: true });
+    $("#dynamicFields").addEventListener("change", scheduleUpdate, { once: true });
+    updateQR();
+  }
+
+  function value(id) {
+    const el = $("#" + id);
+    return el ? (el.type === "checkbox" ? el.checked : el.value.trim()) : "";
+  }
+  function required(value, label) {
+    if (!value) throw new Error("Please enter " + label.toLowerCase() + ".");
+    return value;
+  }
+  function escapeWifi(value) {
+    return String(value).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/:/g, "\\:").replace(/"/g, '\\"');
+  }
+  function vcardEscape(value) {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+  }
+  function cleanPhone(value, label) {
+    const cleaned = String(value || "").replace(/[^+0-9]/g, "");
+    if (!/^\+?[0-9]{6,15}$/.test(cleaned)) throw new Error("Enter a valid " + label.toLowerCase() + " with country code.");
+    return cleaned;
+  }
+  function safeUrl(raw) {
+    const candidate = /^https?:\/\//i.test(raw) ? raw : "https://" + raw;
+    let parsed;
+    try { parsed = new URL(candidate); } catch (_) { throw new Error("Enter a valid website URL."); }
+    if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname.includes(".")) throw new Error("Only valid http:// and https:// website addresses are supported.");
+    return parsed.href;
+  }
+  function dateStamp(raw) {
+    if (!raw) return "";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) throw new Error("Enter a valid event date and time.");
+    const pad = n => String(n).padStart(2, "0");
+    return date.getUTCFullYear() + pad(date.getUTCMonth() + 1) + pad(date.getUTCDate()) + "T" + pad(date.getUTCHours()) + pad(date.getUTCMinutes()) + "00Z";
+  }
+
+  function buildPayload() {
+    switch (state.type) {
+      case "url": return safeUrl(required(value("url"), "a website URL"));
+      case "text": return required(value("text"), "your message");
+      case "wifi": {
+        const ssid = required(value("ssid"), "the network name");
+        const security = value("security");
+        const password = value("password");
+        if (security !== "nopass" && !password) throw new Error("Enter the Wi-Fi password or choose No password.");
+        return "WIFI:T:" + security + ";S:" + escapeWifi(ssid) + ";P:" + (security === "nopass" ? "" : escapeWifi(password)) + ";H:" + (value("hidden") ? "true" : "false") + ";;";
+      }
+      case "whatsapp": {
+        const phone = cleanPhone(required(value("waPhone"), "a WhatsApp number"), "WhatsApp number").replace(/^\+/, "");
+        const message = value("waMessage");
+        return "https://wa.me/" + phone + (message ? "?text=" + encodeURIComponent(message) : "");
+      }
+      case "email": {
+        const email = required(value("emailTo"), "an email address");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+        const params = new URLSearchParams();
+        if (value("emailSubject")) params.set("subject", value("emailSubject"));
+        if (value("emailBody")) params.set("body", value("emailBody"));
+        return "mailto:" + email + (params.toString() ? "?" + params.toString() : "");
+      }
+      case "phone": return "tel:" + cleanPhone(required(value("phone"), "a phone number"), "phone number");
+      case "sms": {
+        const phone = cleanPhone(required(value("smsPhone"), "a phone number"), "phone number");
+        return "SMSTO:" + phone + ":" + value("smsMessage");
+      }
+      case "vcard": {
+        const first = value("firstName"), last = value("lastName");
+        if (!first && !last) throw new Error("Enter at least a first name or last name.");
+        const lines = ["BEGIN:VCARD", "VERSION:3.0", "N:" + vcardEscape(last) + ";" + vcardEscape(first) + ";;;", "FN:" + vcardEscape((first + " " + last).trim())];
+        if (value("org")) lines.push("ORG:" + vcardEscape(value("org")));
+        if (value("title")) lines.push("TITLE:" + vcardEscape(value("title")));
+        if (value("mobile")) lines.push("TEL;TYPE=CELL:" + vcardEscape(value("mobile")));
+        if (value("workEmail")) lines.push("EMAIL:" + vcardEscape(value("workEmail")));
+        if (value("website")) lines.push("URL:" + vcardEscape(value("website")));
+        lines.push("END:VCARD");
+        return lines.join("\r\n");
+      }
+      case "location": {
+        const lat = Number(value("latitude")), lon = Number(value("longitude"));
+        if (value("latitude") === "" || value("longitude") === "" || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) throw new Error("Enter valid latitude (−90 to 90) and longitude (−180 to 180).");
+        const label = value("placeName");
+        return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(lat + "," + lon + (label ? " (" + label + ")" : ""));
+      }
+      case "event": {
+        const title = required(value("eventTitle"), "an event title");
+        const start = dateStamp(value("eventStart"));
+        const end = dateStamp(value("eventEnd"));
+        if (!start || !end) throw new Error("Choose both event start and end times.");
+        if (new Date(value("eventEnd")) <= new Date(value("eventStart"))) throw new Error("Event end must be after its start.");
+        const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//QRForge//QRForge Calendar//EN", "BEGIN:VEVENT", "UID:" + Date.now() + "@qrforge", "DTSTAMP:" + dateStamp(new Date().toISOString()), "DTSTART:" + start, "DTEND:" + end, "SUMMARY:" + vcardEscape(title)];
+        if (value("eventLocation")) lines.push("LOCATION:" + vcardEscape(value("eventLocation")));
+        if (value("eventDescription")) lines.push("DESCRIPTION:" + vcardEscape(value("eventDescription")));
+        lines.push("END:VEVENT", "END:VCALENDAR");
+        return lines.join("\r\n");
+      }
+      default: throw new Error("Choose a QR code type.");
+    }
+  }
+
+  function setStatus(message, mode) {
+    const el = $("#scanStatus");
+    el.className = "scan-status" + (mode ? " " + mode : "");
+    const icon = mode === "good" ? "fa-circle-check" : mode === "bad" ? "fa-circle-exclamation" : "fa-circle";
+    el.innerHTML = '<i class="fa-regular ' + icon + '"></i><span></span>';
+    $("span", el).textContent = message;
+  }
+  function setActions(enabled) {
+    $("#downloadPng").disabled = !enabled;
+    $("#downloadSvg").disabled = !enabled;
+    $("#saveCode").disabled = !enabled;
+  }
+  function qrSettings() {
+    return {
+      size: Number($("#qrSize").value),
+      fg: $("#fgColor").value,
+      bg: $("#bgColor").value,
+      level: $("#qrLevel").value,
+      margin: 4
+    };
+  }
+  function renderMatrix(payload) {
+    if (typeof window.qrcode !== "function") throw new Error("QR engine did not load. Check your internet connection and refresh the page.");
+    const settings = qrSettings();
+    const qr = window.qrcode(0, settings.level);
+    qr.addData(payload, "Byte");
+    qr.make();
+    const count = qr.getModuleCount();
+    const canvas = document.createElement("canvas");
+    canvas.width = settings.size;
+    canvas.height = settings.size;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = settings.bg;
+    ctx.fillRect(0, 0, settings.size, settings.size);
+    const unit = settings.size / (count + settings.margin * 2);
+    ctx.fillStyle = settings.fg;
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (qr.isDark(row, col)) {
+          const x = Math.floor((col + settings.margin) * unit);
+          const y = Math.floor((row + settings.margin) * unit);
+          const right = Math.ceil((col + settings.margin + 1) * unit);
+          const bottom = Math.ceil((row + settings.margin + 1) * unit);
+          ctx.fillRect(x, y, right - x, bottom - y);
+        }
+      }
+    }
+    return { canvas, qr, settings, count };
+  }
+
+  function updateQR() {
+    clearTimeout(state.debounce);
+    state.debounce = setTimeout(() => {
+      try {
+        const payload = buildPayload();
+        if (payload.length > 2800) throw new Error("This content is too long for this QR Studio version. Shorten it or use a URL.");
+        const result = renderMatrix(payload);
+        state.payload = payload;
+        state.canvas = result.canvas;
+        state.matrix = result;
+        state.valid = true;
+        $("#qrPlaceholder").hidden = true;
+        $("#qrRender").hidden = false;
+        $("#qrRender").replaceChildren(result.canvas);
+        setStatus("QR code ready · " + result.count + " × " + result.count + " modules", "good");
+        setActions(true);
+      } catch (error) {
+        state.valid = false;
+        state.payload = "";
+        state.canvas = null;
+        $("#qrPlaceholder").hidden = false;
+        $("#qrRender").hidden = true;
+        $("#qrPlaceholder strong").textContent = "Ready when you are";
+        $("#qrPlaceholder > span").textContent = error.message;
+        setStatus(error.message, "bad");
+        setActions(false);
+      }
+    }, 90);
+  }
+  function scheduleUpdate() { updateQR(); }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function downloadPng() {
+    if (!state.valid || !state.canvas) return;
+    state.canvas.toBlob(blob => { if (blob) downloadBlob(blob, "qrforge-" + state.type + ".png"); else showToast("Could not create PNG. Please try again."); }, "image/png");
+  }
+  function downloadSvg() {
+    if (!state.valid || !state.matrix) return;
+    const { qr, settings, count } = state.matrix;
+    const total = count + settings.margin * 2;
+    const paths = [];
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (qr.isDark(row, col)) paths.push("M" + (col + settings.margin) + " " + (row + settings.margin) + "h1v1h-1z");
+      }
+    }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' ' + total + '" width="' + settings.size + '" height="' + settings.size + '" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="' + settings.bg + '"/><path d="' + paths.join("") + '" fill="' + settings.fg + '"/></svg>';
+    downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "qrforge-" + state.type + ".svg");
+  }
+
+  function showToast(message) {
+    const wrap = document.createElement("div");
+    wrap.className = "toast align-items-center";
+    wrap.setAttribute("role", "status");
+    wrap.innerHTML = '<div class="d-flex"><div class="toast-body"></div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+    $(".toast-body", wrap).textContent = message;
+    $("#toastArea").appendChild(wrap);
+    if (window.bootstrap && window.bootstrap.Toast) {
+      const toast = new bootstrap.Toast(wrap, { delay: 2600 });
+      toast.show();
+      wrap.addEventListener("hidden.bs.toast", () => wrap.remove());
+    } else {
+      wrap.classList.add("show");
+      setTimeout(() => wrap.remove(), 2600);
+    }
+  }
+
+  function readSaved() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) { return []; }
+  }
+  function writeSaved(items) {
+    try { localStorage.setItem(storageKey, JSON.stringify(items.slice(0, 30))); return true; }
+    catch (_) { showToast("Browser storage is full or unavailable."); return false; }
+  }
+  function saveCurrent() {
+    if (!state.valid) return;
+    const items = readSaved();
+    const title = (state.payload.length > 42 ? state.payload.slice(0, 39) + "…" : state.payload) || typeNames[state.type];
+    items.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: state.type, title, payload: state.payload, savedAt: new Date().toISOString(), settings: qrSettings() });
+    if (writeSaved(items)) { renderSaved(); showToast("QR code saved in this browser."); }
+  }
+  function renderSaved() {
+    const items = readSaved();
+    $("#savedCount").textContent = items.length;
+    const list = $("#savedList");
+    list.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-saved";
+      empty.innerHTML = '<i class="fa-regular fa-folder-open"></i><span>Your saved codes will show up here.</span>';
+      list.appendChild(empty);
+      return;
+    }
+    items.slice(0, 5).forEach(item => {
+      const row = document.createElement("div");
+      row.className = "saved-item";
+      const thumb = document.createElement("div"); thumb.className = "saved-thumb";
+      const icon = document.createElement("i"); icon.className = "fa-solid " + (iconNames[item.type] || "fa-qrcode"); thumb.appendChild(icon);
+      const meta = document.createElement("div"); meta.className = "saved-meta";
+      const title = document.createElement("strong"); title.textContent = item.title || typeNames[item.type];
+      const sub = document.createElement("span"); sub.textContent = (typeNames[item.type] || "QR code") + " · " + new Date(item.savedAt).toLocaleDateString();
+      meta.append(title, sub);
+      const load = document.createElement("button"); load.type = "button"; load.title = "Load QR code"; load.setAttribute("aria-label", "Load " + (item.title || "saved QR code")); load.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i>';
+      load.addEventListener("click", () => loadSaved(item));
+      const remove = document.createElement("button"); remove.type = "button"; remove.title = "Delete"; remove.setAttribute("aria-label", "Delete saved QR code"); remove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
+      remove.addEventListener("click", () => { writeSaved(readSaved().filter(x => x.id !== item.id)); renderSaved(); });
+      row.append(thumb, meta, load, remove); list.appendChild(row);
+    });
+  }
+  function loadSaved(item) {
+    const button = $('.type-card[data-type="' + item.type + '"]');
+    if (button) button.click();
+    const settings = item.settings || {};
+    if (settings.fg) $("#fgColor").value = settings.fg;
+    if (settings.bg) $("#bgColor").value = settings.bg;
+    if (settings.size) $("#qrSize").value = String(settings.size);
+    if (settings.level) $("#qrLevel").value = settings.level;
+    const idMap = {
+      url: { url: item.payload }, text: { text: item.payload },
+      whatsapp: { waPhone: item.payload.match(/^https:\/\/wa\.me\/([^?]+)/)?.[1] || "", waMessage: new URL(item.payload).searchParams.get("text") || "" }
+    };
+    if (idMap[item.type]) Object.entries(idMap[item.type]).forEach(([id, val]) => { if ($("#" + id)) $("#" + id).value = val; });
+    if (item.type === "url" || item.type === "text" || item.type === "whatsapp") updateQR();
+    else {
+      showToast("This saved QR is available in your browser history, but its editable fields are not restored yet.");
+      state.payload = item.payload;
+      state.valid = true;
+      try { const result = renderMatrix(item.payload); state.matrix = result; state.canvas = result.canvas; $("#qrPlaceholder").hidden = true; $("#qrRender").hidden = false; $("#qrRender").replaceChildren(result.canvas); setStatus("Saved QR code loaded", "good"); setActions(true); } catch (e) { showToast(e.message); }
+    }
+    $("#studio").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function chooseType(type) {
+    if (!fields[type]) return;
+    state.type = type;
+    $$(".type-card").forEach(button => {
+      const active = button.dataset.type === type;
+      button.classList.toggle("selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    renderFields();
+  }
+
+  $$(".type-card").forEach(button => {
+    button.setAttribute("aria-pressed", button.classList.contains("selected") ? "true" : "false");
+    button.addEventListener("click", () => chooseType(button.dataset.type));
+  });
+  $("#dynamicFields").addEventListener("input", scheduleUpdate);
+  $("#dynamicFields").addEventListener("change", scheduleUpdate);
+  ["fgColor", "bgColor", "qrSize", "qrLevel"].forEach(id => {
+    $("#" + id).addEventListener("input", () => {
+      if (id === "fgColor") $("#fgHex").textContent = $("#" + id).value.toUpperCase();
+      if (id === "bgColor") $("#bgHex").textContent = $("#" + id).value.toUpperCase();
+      updateQR();
+    });
+    $("#" + id).addEventListener("change", updateQR);
+  });
+  $("#downloadPng").addEventListener("click", downloadPng);
+  $("#downloadSvg").addEventListener("click", downloadSvg);
+  $("#saveCode").addEventListener("click", saveCurrent);
+  $("#clearFields").addEventListener("click", () => { renderFields(); showToast("Fields cleared."); });
+  $("#clearSaved").addEventListener("click", () => {
+    if (!readSaved().length) return;
+    if (window.confirm("Delete all QR codes saved in this browser?")) { localStorage.removeItem(storageKey); renderSaved(); showToast("Saved codes cleared."); }
+  });
+  $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  $("#navMyCodes").addEventListener("click", () => { $("#sidebar").classList.remove("open"); setTimeout(() => $("#my-codes").scrollIntoView({ behavior: "smooth" }), 80); });
+
+  renderSaved();
+  renderFields();
+})();
