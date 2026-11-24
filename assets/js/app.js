@@ -240,7 +240,9 @@
         $("#qrPlaceholder").hidden = true;
         $("#qrRender").hidden = false;
         $("#qrRender").replaceChildren(result.canvas);
-        const ratio = contrastRatio(settings.fg, settings.bg);\n        if (ratio < 4.5) setStatus("Low contrast (" + ratio.toFixed(1) + ":1). Choose darker QR colour for reliable scanning.", "warn");\n        else setStatus("QR code ready · " + result.count + " × " + result.count + " modules", "good");
+        const ratio = contrastRatio(result.settings.fg, result.settings.bg);
+        if (ratio < 4.5) setStatus("Low contrast (" + ratio.toFixed(1) + ":1). Choose darker QR colour for reliable scanning.", "warn");
+        else setStatus("QR code ready · " + result.count + " × " + result.count + " modules", "good");
         setActions(true);
       } catch (error) {
         state.valid = false;
