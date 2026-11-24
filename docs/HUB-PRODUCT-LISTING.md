@@ -98,8 +98,9 @@ A future paid tier may include dynamic QR destinations, scan analytics, bulk gen
 
 ## Preview and production hosting
 
-Suggested hostnames, subject to DNS and hosting provisioning:
-- Preview: `qrforge-preview.docsansar.com`
-- Production: `qrforge.docsansar.com`
+Do not create a separate subdomain for every product. Use one shared preview host with a product-specific path, for example:
+- Preview: `preview.docsansar.com/qrforge/`
+- Other product previews: `preview.docsansar.com/{product-slug}/`
+- Production: serve the approved product through its Hub product route, for example `docsansar.com/products/qrforge/`, or the canonical product URL configured by Hub.
 
-This MVP is static HTML/CSS/JS and does not require PHP or a database. It can be served as static files, but the preview host must still be isolated from the Hub application's executable directories and secrets. A separate subdomain alone is not a security boundary.
+The shared preview host should map each product to a separate deployment directory and must not execute untrusted product PHP inside the Hub application. This QRForge MVP is static HTML/CSS/JS and can be served without PHP or a database. Keep deployment configuration centralized so adding a product means adding a directory/release mapping, not creating DNS records or a new subdomain.
