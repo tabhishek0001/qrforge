@@ -171,7 +171,7 @@
         if (value("upiName")) params.set("pn", value("upiName"));
         if (value("upiAmount")) {
           const amount = Number(value("upiAmount"));
-          if (!Number.isFinite(amount) || amount <= 0 || !/^\\d+(?:\\.\\d{1,2})?$/.test(value("upiAmount"))) throw new Error("Enter a valid payment amount with up to two decimal places.");
+          if (!Number.isFinite(amount) || amount <= 0 || !/^\d+(?:\.\d{1,2})?$/.test(value("upiAmount"))) throw new Error("Enter a valid payment amount with up to two decimal places.");
           params.set("am", amount.toFixed(2));
         }
         if (value("upiNote")) params.set("tn", value("upiNote"));
